@@ -1,156 +1,76 @@
-#!/bin/bash
+#!/usr/bin/env python3
+# -*- coding: utf8 -*-
 
-#   aurcheck 0.7 - check for updates from AUR
-#
-#   Copyright (c) 2009 by Arkham <arkham at archlinux dot us>
-#
-#   This program is free software; you can redistribute it and/or modify
-#   it under the terms of the GNU General Public License as published by
-#   the Free Software Foundation; either version 2 of the License, or
-#   (at your optio n) any later version.
-#
-#   This program is distributed in the hope that it will be useful,
-#   but WITHOUT ANY WARRANTY; without even the implied warranty of
-#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#   GNU General Public License for more details.
-#
-#   You should have received a copy of the GNU General Public License
-#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import sys
+import AUR.RPC as AUR
+from time import localtime, strftime 
+
+class Aurget(AUR.AUR):
+    def __init__(self,pkgnames ):
+        super(Aurget, self).__init__(ttl=1, log_func=lambda x,y: None)
+        self.pkgnames=pkgnames
+      
+    def get_aur_pkgs(self):
+        """Search the AUR."""
+        try:
+            return AUR.insert_full_urls(self.info(self.pkgnames))
+        except AUR.AURError as e:
+            sys.stderr.write(str(e))
+            sys.exit(1)
+
+def get_upgradable():
+  """Search for upgradable packages."""
+  try:
+    from pycman import config
+    import pyalpm
+  except ImportError:
+    sys.stderr.write("error: pyalpm required for determining upgradable packages\n")
+    return
+
+  h = config.init_with_config("/etc/pacman.conf")
+  installed = set(h.get_localdb().pkgcache)
+
+  for db in h.get_syncdbs():
+    for pkg in list(installed):
+      pkgname = pkg.name
+      syncpkg = db.get_pkg(pkgname)
+      if syncpkg:
+        installed.remove(pkg)
+
+  foreign = dict([(p.name,p) for p in installed])
+
+  ag1 = Aurget((p.name for p in installed))
+
+  for aur_pkg in ag1.get_aur_pkgs():
+      installed_pkg = foreign[aur_pkg['Name']]
+      if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) > 0:
+        yield aur_pkg['Name']
 
 
-badarg () {
-    echo "$aurcheck: Try \`$aurcheck -h' for more information." >&2
-}
+def main():
+    pkgnames = set(get_upgradable())
 
-usage () {
-    echo -e "${GREEN}$aurcheck${NC}: check for updates from AUR"
-    echo -e "usage: ${GREEN}$aurcheck${NC} [OPTIONS]"
-    echo
-    echo "OPTIONS:"
-    echo -e " -b:  compare both pkgver and pkgrel ${RED}[default]${NC}"
-    echo -e " -c:  colorful output ${RED}[default]${NC}"
-    echo " -h:  show this help and quit"
-    echo " -n:  nocolor, plain and simple output"
-    echo " -o:  compare only pkgver ignoring pkgrel"
-    echo " -q:  quiet, display only updates"
-    echo -e " -v:  verbose, display all packages ${RED}[default]${NC}"
-    echo
-}
+    if not pkgnames:
+        print("nothing to do")
+        return
 
-aurcmp () {
-    # Create temporary url and get PKGBUILD
-    pkgname="$1"
-    url="https://aur.archlinux.org/packages/${pkgname:0:2}/$pkgname/PKGBUILD"
-
-    PKGBUILD=$(wget -q -O - "$url" | grep -E '^(pkgver=|pkgrel=|_)') || {
-        # Package not found in AUR
-        if [[ "$VERBOSE" == "true" ]]; then
-            echo -e "$pkgname: ${YELLOW}not found in AUR${NC}"
-        fi
-        return 0
-    }
-
-    # Compare versions
-    aurver="$(eval "$PKGBUILD" &>/dev/null; echo "$pkgver-$pkgrel")" || true
-    localver="$(LANG=C $PACMAN -Qi "$pkgname" | awk '/^Version/ {print $3}')"
-    if [[ "$ONLYVER" == "true" ]]; then
-        aurver="$(echo "$aurver" | cut -d'-' -f1)"
-        localver="$(echo "$localver" | cut -d'-' -f1)"
-    fi
-
-    result=$(vercmp "$localver" "$aurver") || true
-
-    # Main switch
-    if [[ "$result" -lt 0 ]]; then
-        echo -e "$pkgname: ${GREEN}$localver => $aurver${NC}"
-    elif [[ "$VERBOSE" == "true" ]]; then
-        if [[ "$result" -gt 0 ]]; then
-            echo -e "$pkgname: (${RED}local=$localver${NC} aur=$aurver)"
-        else
-            echo "$pkgname: $TIP_DONE"
-        fi
-    fi
-}
-
-# Safety options:
-# - no unset variables
-set -o nounset
-# - no errors in return values
-set -o errexit
-
-# Flags default values
-COLOR="true"
-ONLYVER="false"
-VERBOSE="true"
-# Colors! :-)
-NC='\e[0m'
-RED='\e[1;31m'
-GREEN='\e[1;32m'
-YELLOW='\e[1;33m'
-
-aurcheck=$(basename $0)
-
-while getopts ":bchnoqv" opt; do
-    case "$opt" in
-        "b")
-            ONLYVER="false"
-            ;;
-        "c")
-            COLOR="true"
-            ;;
-        "h")
-            usage
-            exit 0
-            ;;
-        "n")
-            COLOR="false"
-            ;;
-        "o")
-            ONLYVER="true"
-            ;;
-        "q")
-            VERBOSE="false"
-            ;;
-        "v")
-            VERBOSE="true"
-            ;;
-        "?")
-            echo "$aurcheck: invalid option -$OPTARG" >&2
-            badarg
-            exit 1
-            ;;
-        ":")
-            echo "$aurcheck: option -$OPTARG requires an argument." >&2
-            badarg
-            exit 1
-            ;;
-        *)
-            echo "$aurcheck: unknown error while processing options." >&2
-            badarg
-            exit 1
-            ;;
-    esac
-done
-
-# No colors :-(
-if [[ $COLOR == "false" ]]; then
-    NC=''
-    RED=''
-    GREEN=''
-    YELLOW=''
-fi
-
-if [[ "$VERBOSE" == "true" ]]; then
-    echo -e "${GREEN}==> ${NC}Searching for new version on AUR"
-fi
-
-# Set pacman path.  (Allows to override pacman, for example, for 32-bit chroots.)
-PACMAN=${PACMAN:-pacman}
-TIP_DONE=${TIP_DONE:-done}
-
-# Main loop
-for pkg in $($PACMAN -Qqm); do 
-    aurcmp "$pkg"
-done
-
-exit 0
+    else:
+        print("searching AUR interface")
+        ag1 = Aurget(pkgnames)
+        for aurpkg in ag1.get_aur_pkgs():
+            print("  found", aurpkg['Name'])
+            pkgnames.remove(aurpkg['Name'])
+            display_fields = ('Version', 'LastModified')
+            aurpkg['LastModified'] = strftime(
+                '%Y-%m-%d %H:%M:%S', localtime(aurpkg['LastModified'])
+            )
+            l = max(len(x) for x in display_fields) + 1
+            fmt = '    %-' + str(l) + 's %s'
+            for df in display_fields:
+              print(fmt % (df + ':', aurpkg[df]))
+    
+if __name__ == '__main__':
+  try:
+    main()
+  except KeyboardInterrupt:
+    pass
