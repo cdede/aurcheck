@@ -43,7 +43,7 @@ def get_upgradable():
 
   for aur_pkg in ag1.get_aur_pkgs():
       installed_pkg = foreign[aur_pkg['Name']]
-      if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) > 0:
+      if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) != 0:
         yield aur_pkg['Name']
 
 
