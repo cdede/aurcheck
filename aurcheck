@@ -20,31 +20,40 @@ class Aurget(AUR.AUR):
             sys.stderr.write(str(e))
             sys.exit(1)
 
-def get_upgradable():
-    """Search for upgradable packages."""
-  
-    h = config.init_with_config("/etc/pacman.conf")
-    installed = set(h.get_localdb().pkgcache)
-  
-    for db in h.get_syncdbs():
-        for pkg in list(installed):
-            pkgname = pkg.name
-            syncpkg = db.get_pkg(pkgname)
-            if syncpkg:
-                installed.remove(pkg)
+class Upgrad(object):
+    def __init__(self ):
+        self.aurs = []
+        self.dict1 = {}
+        self.get_upgradable()
+    
+    def get_upgradable(self):
+        """Search for upgradable packages."""
       
-    foreign = dict([(p.name,p) for p in installed])
-  
-    ag1 = Aurget((p.name for p in installed))
-  
-    for aur_pkg in ag1.get_aur_pkgs():
-        installed_pkg = foreign[aur_pkg['Name']]
-        if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) != 0:
-            yield aur_pkg['Name']
-  
+        h = config.init_with_config("/etc/pacman.conf")
+        installed = set(h.get_localdb().pkgcache)
+      
+        for db in h.get_syncdbs():
+            for pkg in list(installed):
+                pkgname = pkg.name
+                syncpkg = db.get_pkg(pkgname)
+                if syncpkg:
+                    installed.remove(pkg)
+          
+        foreign = dict([(p.name,p) for p in installed])
+      
+        ag1 = Aurget((p.name for p in installed))
+      
+        for aur_pkg in ag1.get_aur_pkgs():
+            installed_pkg = foreign[aur_pkg['Name']]
+            if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) != 0:
+                key = aur_pkg['Name']
+                self.aurs.append(key)
+                self.dict1[key]= installed_pkg.version
+      
 
 def main():
-    pkgnames = set(get_upgradable())
+    up1 = Upgrad()
+    pkgnames = set(up1.aurs)
 
     if not pkgnames:
         print("nothing to do")
@@ -54,8 +63,9 @@ def main():
         print("searching AUR interface")
         ag1 = Aurget(pkgnames)
         for aurpkg in ag1.get_aur_pkgs():
-            print("  found", aurpkg['Name'])
-            pkgnames.remove(aurpkg['Name'])
+            tmp1 = aurpkg['Name']
+            print("  found", tmp1)
+            pkgnames.remove(tmp1)
             display_fields = ('Version', 'LastModified')
             aurpkg['LastModified'] = strftime(
                 '%Y-%m-%d %H:%M:%S', localtime(aurpkg['LastModified'])
@@ -64,6 +74,7 @@ def main():
             fmt = '    %-' + str(l) + 's %s'
             for df in display_fields:
                 print(fmt % (df + ':', aurpkg[df]))
+            print ('local Version : %s ' % up1.dict1[tmp1])
     
 if __name__ == '__main__':
     try:
