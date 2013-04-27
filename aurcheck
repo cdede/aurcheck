@@ -66,15 +66,15 @@ def main():
             tmp1 = aurpkg['Name']
             print("  found", tmp1)
             pkgnames.remove(tmp1)
-            display_fields = ('Version', 'LastModified')
+            display_fields = ('LocalVersion','Version', 'LastModified')
             aurpkg['LastModified'] = strftime(
                 '%Y-%m-%d %H:%M:%S', localtime(aurpkg['LastModified'])
             )
+            aurpkg['LocalVersion'] = up1.dict1[tmp1]
             l = max(len(x) for x in display_fields) + 1
             fmt = '    %-' + str(l) + 's %s'
             for df in display_fields:
                 print(fmt % (df + ':', aurpkg[df]))
-            print ('local Version : %s ' % up1.dict1[tmp1])
     
 if __name__ == '__main__':
     try:
