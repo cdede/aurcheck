@@ -4,6 +4,8 @@
 import sys
 import AUR.RPC as AUR
 from time import localtime, strftime 
+from pycman import config
+import pyalpm
 
 class Aurget(AUR.AUR):
     def __init__(self,pkgnames ):
@@ -20,12 +22,6 @@ class Aurget(AUR.AUR):
 
 def get_upgradable():
     """Search for upgradable packages."""
-    try:
-        from pycman import config
-        import pyalpm
-    except ImportError:
-        sys.stderr.write("error: pyalpm required for determining upgradable packages\n")
-        return
   
     h = config.init_with_config("/etc/pacman.conf")
     installed = set(h.get_localdb().pkgcache)
@@ -67,7 +63,7 @@ def main():
             l = max(len(x) for x in display_fields) + 1
             fmt = '    %-' + str(l) + 's %s'
             for df in display_fields:
-              print(fmt % (df + ':', aurpkg[df]))
+                print(fmt % (df + ':', aurpkg[df]))
     
 if __name__ == '__main__':
     try:
