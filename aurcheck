@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # -*- coding: utf8 -*-
 
 import sys
@@ -19,33 +19,33 @@ class Aurget(AUR.AUR):
             sys.exit(1)
 
 def get_upgradable():
-  """Search for upgradable packages."""
-  try:
-    from pycman import config
-    import pyalpm
-  except ImportError:
-    sys.stderr.write("error: pyalpm required for determining upgradable packages\n")
-    return
-
-  h = config.init_with_config("/etc/pacman.conf")
-  installed = set(h.get_localdb().pkgcache)
-
-  for db in h.get_syncdbs():
-    for pkg in list(installed):
-      pkgname = pkg.name
-      syncpkg = db.get_pkg(pkgname)
-      if syncpkg:
-        installed.remove(pkg)
-
-  foreign = dict([(p.name,p) for p in installed])
-
-  ag1 = Aurget((p.name for p in installed))
-
-  for aur_pkg in ag1.get_aur_pkgs():
-      installed_pkg = foreign[aur_pkg['Name']]
-      if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) != 0:
-        yield aur_pkg['Name']
-
+    """Search for upgradable packages."""
+    try:
+        from pycman import config
+        import pyalpm
+    except ImportError:
+        sys.stderr.write("error: pyalpm required for determining upgradable packages\n")
+        return
+  
+    h = config.init_with_config("/etc/pacman.conf")
+    installed = set(h.get_localdb().pkgcache)
+  
+    for db in h.get_syncdbs():
+        for pkg in list(installed):
+            pkgname = pkg.name
+            syncpkg = db.get_pkg(pkgname)
+            if syncpkg:
+                installed.remove(pkg)
+      
+    foreign = dict([(p.name,p) for p in installed])
+  
+    ag1 = Aurget((p.name for p in installed))
+  
+    for aur_pkg in ag1.get_aur_pkgs():
+        installed_pkg = foreign[aur_pkg['Name']]
+        if pyalpm.vercmp(aur_pkg['Version'], installed_pkg.version) != 0:
+            yield aur_pkg['Name']
+  
 
 def main():
     pkgnames = set(get_upgradable())
@@ -70,7 +70,7 @@ def main():
               print(fmt % (df + ':', aurpkg[df]))
     
 if __name__ == '__main__':
-  try:
-    main()
-  except KeyboardInterrupt:
-    pass
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
